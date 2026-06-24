@@ -1,0 +1,79 @@
+name: Build Extension Artifacts
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [chrome-mv3, firefox-mv2]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build + package
+        env:
+          CRX_PRIVATE_KEY_PEM: ${{ secrets.CRX_PRIVATE_KEY_PEM }}
+          FIREFOX_EXTENSION_ID: ${{ secrets.FIREFOX_EXTENSION_ID }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          if [ "${{ matrix.target }}" = "chrome-mv3" ]; then
+            pnpm run package:chrome
+          else
+            pnpm run package:firefox
+          fi
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.target == 'firefox-mv2' && 'crawlsub-firefox-mv2-xpi' || format('crawlsub-{0}-zip', matrix.target) }}
+          path: ${{ matrix.target == 'firefox-mv2' && 'dist/crawlsub-firefox-mv2-v*.xpi' || format('dist/crawlsub-{0}-v*.zip', matrix.target) }}
+
+      - name: Upload crx artifact
+        if: matrix.target == 'chrome-mv3'
+        uses: actions/upload-artifact@v7
+        with:
+          name: crawlsub-chrome-mv3-crx
+          path: dist/crawlsub-chrome-mv3-v*.crx
+          if-no-files-found: ignore
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download workflow artifacts
+        uses: actions/download-artifact@v5
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/crawlsub-chrome-mv3-v*.zip
+            dist/crawlsub-chrome-mv3-v*.crx
+            dist/crawlsub-firefox-mv2-v*.xpi

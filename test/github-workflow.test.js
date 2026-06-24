@@ -1,0 +1,41 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+
+test("build workflow uses pnpm with Node 24", () => {
+  const workflowPath = path.join(__dirname, "..", ".github", "workflows", "build-extension.yml");
+  const workflow = fs.readFileSync(workflowPath, "utf8");
+  const pnpmSetupIndex = workflow.indexOf("uses: pnpm/action-setup@v6");
+  const nodeSetupIndex = workflow.indexOf("uses: actions/setup-node@v6");
+
+  assert.notEqual(pnpmSetupIndex, -1);
+  assert.notEqual(nodeSetupIndex, -1);
+  assert.ok(pnpmSetupIndex < nodeSetupIndex, "pnpm setup must run before setup-node cache");
+  assert.match(workflow, /uses:\s*actions\/checkout@v7/);
+  assert.match(workflow, /node-version:\s*24/);
+  assert.match(workflow, /cache:\s*pnpm/);
+  assert.match(workflow, /uses:\s*actions\/setup-node@v6/);
+  assert.match(workflow, /uses:\s*pnpm\/action-setup@v6/);
+  assert.match(workflow, /uses:\s*actions\/upload-artifact@v7/);
+  assert.match(workflow, /permissions:\s*[\s\S]*contents:\s*write/);
+  assert.match(workflow, /run:\s*pnpm install --frozen-lockfile/);
+  assert.match(workflow, /pnpm run package:chrome/);
+  assert.match(workflow, /pnpm run package:firefox/);
+  assert.match(workflow, /FIREFOX_EXTENSION_ID:\s*\$\{\{ secrets\.FIREFOX_EXTENSION_ID \}\}/);
+  assert.match(workflow, /name:\s*\$\{\{ matrix\.target == 'firefox-mv2' && 'crawlsub-firefox-mv2-xpi'/);
+  assert.match(workflow, /format\('crawlsub-\{0\}-zip', matrix\.target\)/);
+  assert.match(workflow, /if:\s*matrix\.target == 'chrome-mv3'/);
+  assert.match(workflow, /if-no-files-found:\s*ignore/);
+  assert.match(workflow, /uses:\s*softprops\/action-gh-release@v2/);
+  assert.match(workflow, /if:\s*startsWith\(github\.ref, 'refs\/tags\/'\)/);
+  assert.match(workflow, /tags:\s*[\s\S]*- ["']\*["']/);
+  assert.match(workflow, /files:\s*[\s\S]*dist\/crawlsub-chrome-mv3-v\*\.zip[\s\S]*dist\/crawlsub-chrome-mv3-v\*\.crx[\s\S]*dist\/crawlsub-firefox-mv2-v\*\.xpi/);
+  assert.doesNotMatch(workflow, /if:\s*matrix\.target == 'chrome-mv3' && secrets\.CRX_PRIVATE_KEY_PEM != ''/);
+  assert.doesNotMatch(workflow, /run:\s*npm ci/);
+  assert.doesNotMatch(workflow, /(^|\n)\s*npm run package:/);
+  assert.doesNotMatch(workflow, /uses:\s*actions\/checkout@v4/);
+  assert.doesNotMatch(workflow, /uses:\s*actions\/setup-node@v4/);
+  assert.doesNotMatch(workflow, /uses:\s*actions\/upload-artifact@v4/);
+  assert.doesNotMatch(workflow, /uses:\s*pnpm\/action-setup@v4/);
+});

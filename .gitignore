@@ -1,0 +1,16 @@
+# AIs
+CLAUDE.md
+AGENTS.md
+.claude
+.codex
+.gitnexus
+docs
+
+node_modules
+
+# utils
+.DS_Store
+keys
+
+# output
+dist

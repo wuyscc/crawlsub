@@ -1,0 +1,47 @@
+{
+  "manifest_version": 2,
+  "name": "CrawlSub",
+  "version": "0.1.0",
+  "description": "Capture and download subtitles from tv360.vn and fptplay.vn",
+  "icons": {
+    "16": "icons/icon@16.png",
+    "32": "icons/icon@32.png",
+    "48": "icons/icon@48.png",
+    "128": "icons/icon@128.png"
+  },
+  "browser_action": {
+    "default_title": "CrawlSub",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "32": "icons/icon@32.png"
+    }
+  },
+  "background": {
+    "scripts": ["src/extension-api.js", "src/download-url.js", "src/subtitle.js", "src/filename.js", "src/background.js"],
+    "persistent": true
+  },
+  "permissions": [
+    "storage",
+    "downloads",
+    "tabs",
+    "webRequest",
+    "notifications",
+    "https://*.tv360.vn/*",
+    "https://*.fptplay.vn/*",
+    "https://*.fptplay.net/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://*.tv360.vn/*", "https://*.fptplay.vn/*"],
+      "js": ["src/providers/tv360.js", "src/providers/fptplay.js", "src/providers/registry.js", "src/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}
