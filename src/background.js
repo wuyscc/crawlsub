@@ -146,14 +146,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
 async function startSingleCrawl(tabId, convertToSrt, includeSource) {
   requestCacheByTab.set(tabId, []);
+  const captureStart = Date.now();
   await api.reloadTab(tabId);
-  await waitForTabComplete(tabId, 10000);
-  await sleep(1200);
+  await waitForTabComplete(tabId, 10000, null, true);
 
   const context = await requestPageContext(tabId);
-  const captureWindowStart = Date.now() - 10000;
+  await waitForSubtitleCandidates(tabId, captureStart, 5000);
   const candidates = (requestCacheByTab.get(tabId) || [])
-    .filter((c) => c.timeStamp >= captureWindowStart)
+    .filter((c) => c.timeStamp >= captureStart)
     .slice()
     .reverse();
   const dedup = dedupeByUrl(candidates).slice(0, 5);
@@ -237,7 +237,7 @@ async function runFullSeasonJob(job, tabId, context, episodes, cfg) {
         continue;
       }
       await api.updateTab(tabId, { url: ep.url });
-      await waitForTabComplete(tabId, 12000, job);
+      await waitForTabComplete(tabId, 12000, job, true);
       if (job.status === "cancelled") break;
       await sleepWithCancel(job, episodeDelayMs);
       lastVisitedEpisodeUrl = ep.url;
@@ -398,9 +398,10 @@ async function requestPageContextWithRetry(tabId) {
   return second || first || { title: "unknown", episodes: [] };
 }
 
-async function waitForTabComplete(tabId, timeoutMs, job = null) {
+async function waitForTabComplete(tabId, timeoutMs, job = null, requireNavigation = false) {
   return new Promise((resolve) => {
     let done = false;
+    let seenLoading = false;
     const timer = setTimeout(() => finish(), timeoutMs);
     const cancelTimer = job ? setInterval(() => {
       if (job.status === "cancelled") finish();
@@ -410,24 +411,22 @@ async function waitForTabComplete(tabId, timeoutMs, job = null) {
       if (done) return;
       done = true;
       clearTimeout(timer);
-       if (cancelTimer) clearInterval(cancelTimer);
+      if (cancelTimer) clearInterval(cancelTimer);
       chrome.tabs.onUpdated.removeListener(onUpdated);
       resolve();
     }
 
     function onUpdated(updatedTabId, changeInfo) {
-      if (updatedTabId === tabId && changeInfo.status === "complete") {
-        finish();
-      }
+      if (updatedTabId !== tabId) return;
+      if (changeInfo.status === "loading") seenLoading = true;
+      if (changeInfo.status === "complete" && (!requireNavigation || seenLoading)) finish();
     }
 
     chrome.tabs.onUpdated.addListener(onUpdated);
     api.getTab(tabId).then((tab) => {
-      if (!tab) {
-        finish();
-        return;
-      }
-      if (tab.status === "complete") finish();
+      if (!tab) { finish(); return; }
+      if (tab.status === "loading") seenLoading = true;
+      if (tab.status === "complete" && (!requireNavigation || seenLoading)) finish();
     }).catch(() => finish());
   });
 }
