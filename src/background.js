@@ -7,11 +7,13 @@ if (typeof importScripts === "function") {
 
 const api = globalThis.extensionApi;
 
-const SUPPORTED_HOSTS = ["tv360.vn", "fptplay.vn", "fptplay.net"];
+const SUPPORTED_HOSTS = ["tv360.vn", "fptplay.vn", "fptplay.net", "fptplay53.net"];
 const TAB_CACHE_LIMIT = 200;
 const DEFAULT_EPISODE_DELAY_MS = 1800; // Keep in sync with popup/popup.js
 const MIN_EPISODE_DELAY_MS = 300;
 const MAX_EPISODE_DELAY_MS = 15000;
+const DEFAULT_SINGLE_DELAY_MS = 3000; // Keep in sync with popup/popup.js
+const MIN_SINGLE_DELAY_MS = 0;
 
 const requestCacheByTab = new Map();
 const jobs = new Map();
@@ -80,7 +82,7 @@ chrome.webRequest.onCompleted.addListener(
     requestCacheByTab.set(details.tabId, arr);
   },
   {
-    urls: ["https://*.tv360.vn/*", "https://*.fptplay.vn/*", "https://*.fptplay.net/*"]
+    urls: ["https://*.tv360.vn/*", "https://*.fptplay.vn/*", "https://*.fptplay.net/*", "https://*.fptplay53.net/*"]
   },
   ["responseHeaders"]
 );
@@ -95,9 +97,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       }
 
       if (msg?.type === "START_SINGLE_CRAWL") {
+        const singleDelayMs = normalizeSingleDelayMs(msg.singleDelayMs);
         updateActionBadge("running");
-        logDebug("info", "single_crawl_start", { tabId: msg.tabId, convertToSrt: !!msg.convertToSrt });
-        const result = await startSingleCrawl(msg.tabId, !!msg.convertToSrt, msg.includeSource !== false);
+        logDebug("info", "single_crawl_start", { tabId: msg.tabId, convertToSrt: !!msg.convertToSrt, singleDelayMs });
+        const result = await startSingleCrawl(msg.tabId, !!msg.convertToSrt, msg.includeSource !== false, singleDelayMs);
         updateActionBadge("success");
         api.notify("Single crawl finished", `Downloaded ${result.downloaded} subtitle(s).`);
         sendResponse({ ok: true, result });
@@ -144,29 +147,39 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   return true;
 });
 
-async function startSingleCrawl(tabId, convertToSrt, includeSource) {
-  requestCacheByTab.set(tabId, []);
-  const captureStart = Date.now();
-  await api.reloadTab(tabId);
-  await waitForTabComplete(tabId, 10000, null, true);
+async function startSingleCrawl(tabId, convertToSrt, includeSource, singleDelayMs = DEFAULT_SINGLE_DELAY_MS) {
+  let candidates = dedupeByUrl((requestCacheByTab.get(tabId) || []).slice().reverse());
+  let context;
 
-  const context = await requestPageContext(tabId);
-  await waitForSubtitleCandidates(tabId, captureStart, 5000);
-  const candidates = (requestCacheByTab.get(tabId) || [])
-    .filter((c) => c.timeStamp >= captureStart)
-    .slice()
-    .reverse();
-  const dedup = dedupeByUrl(candidates).slice(0, 5);
+  if (candidates.length === 0) {
+    requestCacheByTab.set(tabId, []);
+    const captureStart = Date.now();
+    await api.updateTab(tabId, { active: true });
+    await api.reloadTab(tabId);
+    await waitForTabComplete(tabId, 10000, null, true);
+    if (singleDelayMs > 0) await sleep(singleDelayMs);
+    context = await requestPageContextWithRetry(tabId);
+    await waitForSubtitleCandidates(tabId, captureStart, 5000);
+    candidates = dedupeByUrl(
+      (requestCacheByTab.get(tabId) || [])
+        .filter((c) => c.timeStamp >= captureStart)
+        .slice()
+        .reverse()
+    );
+  } else {
+    context = await requestPageContextWithRetry(tabId);
+  }
 
+  const selected = selectBestSubtitleCandidates(candidates.slice(0, 5), 1);
   const downloaded = [];
-  for (const c of dedup) {
+  for (const c of selected) {
     const out = await downloadCandidate(c, context, convertToSrt, null, undefined, includeSource);
     if (out) downloaded.push(out);
   }
 
   return {
     mode: "single",
-    title: context.title,
+    title: context?.title || "unknown",
     downloaded: downloaded.length,
     files: downloaded
   };
@@ -240,6 +253,7 @@ async function runFullSeasonJob(job, tabId, context, episodes, cfg) {
       await waitForTabComplete(tabId, 12000, job, true);
       if (job.status === "cancelled") break;
       await sleepWithCancel(job, episodeDelayMs);
+      if (job.status === "cancelled") break;
       lastVisitedEpisodeUrl = ep.url;
     }
 
@@ -360,6 +374,15 @@ function normalizeEpisodeDelayMs(raw) {
   if (!Number.isFinite(n)) return DEFAULT_EPISODE_DELAY_MS;
   const rounded = Math.round(n);
   if (rounded < MIN_EPISODE_DELAY_MS) return MIN_EPISODE_DELAY_MS;
+  if (rounded > MAX_EPISODE_DELAY_MS) return MAX_EPISODE_DELAY_MS;
+  return rounded;
+}
+
+function normalizeSingleDelayMs(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return DEFAULT_SINGLE_DELAY_MS;
+  const rounded = Math.round(n);
+  if (rounded < MIN_SINGLE_DELAY_MS) return MIN_SINGLE_DELAY_MS;
   if (rounded > MAX_EPISODE_DELAY_MS) return MAX_EPISODE_DELAY_MS;
   return rounded;
 }

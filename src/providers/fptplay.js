@@ -1,15 +1,16 @@
 function sanitizeFptSeriesTitle(rawTitle) {
   return String(rawTitle || "unknown")
+    .replace(/\s*\|.*$/, "")
     .replace(/\s*\((?:season|phần|phan)\s*\d{1,2}\)\s*$/i, "")
     .replace(/\s*[-|:]\s*(?:season|phần|phan)\s*\d{1,2}\s*$/i, "")
     .trim();
 }
 
-function inferSeasonFromFptTitles(secondaryTitle, primaryTitle) {
-  const fromSecondary = parseSeasonFromText(secondaryTitle);
-  if (Number.isFinite(fromSecondary)) return fromSecondary;
-  const fromPrimary = parseSeasonFromText(primaryTitle);
-  if (Number.isFinite(fromPrimary)) return fromPrimary;
+function inferSeasonFromFptTitles(englishTitle, vietnameseTitle) {
+  const fromEnglish = parseSeasonFromText(englishTitle);
+  if (Number.isFinite(fromEnglish)) return fromEnglish;
+  const fromVietnamese = parseSeasonFromText(vietnameseTitle);
+  if (Number.isFinite(fromVietnamese)) return fromVietnamese;
   return NaN;
 }
 
@@ -31,13 +32,13 @@ function isLikelyFptEpisodeLink(anchor) {
 
 function extractFptPlayContext() {
   const headerRoot = document.querySelector(".mb-4.xl\\:mb-6") || document;
-  const subtitleTitle = headerRoot.querySelector("h2")?.textContent?.trim() || document.querySelector("h2")?.textContent?.trim() || "";
-  const primaryTitle = headerRoot.querySelector("h1")?.textContent?.trim() || document.querySelector("h1")?.textContent?.trim() || "";
-  const season = inferSeasonFromFptTitles(subtitleTitle, primaryTitle);
+  const englishTitle = headerRoot.querySelector("h2")?.textContent?.trim() || document.querySelector("h2")?.textContent?.trim() || "";
+  const vietnameseTitle = headerRoot.querySelector("h1")?.textContent?.trim() || document.querySelector("h1")?.textContent?.trim() || "";
+  const season = inferSeasonFromFptTitles(englishTitle, vietnameseTitle);
   const rawTitle =
-    subtitleTitle ||
+    englishTitle ||
+    vietnameseTitle ||
     document.querySelector(".ListEspisodeComponent span.line-clamp-1")?.textContent?.trim() ||
-    primaryTitle ||
     document.querySelector(".title, .film-title")?.textContent?.trim() ||
     document.title ||
     "unknown";
@@ -48,7 +49,7 @@ function extractFptPlayContext() {
     "";
   const currentEpisodeNumber = extractFptCurrentEpisodeNumber(episodeTitle, rawTitle, window.location.href);
 
-  const sourceAnchors = Array.from(document.querySelectorAll(".ListEspisodeComponent .episode-list a.EpisodeItem[href]"));
+  const sourceAnchors = Array.from(document.querySelectorAll(".ListEspisodeComponent.episode-list a.EpisodeItem[href]"));
   const episodeAnchors = sourceAnchors.filter((a) => isLikelyFptEpisodeLink(a)).slice(0, 220);
 
   return {

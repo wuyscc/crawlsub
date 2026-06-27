@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "scripts": {
     "test": "node --test",
+    "build:css": "tailwindcss -i popup/tailwind.input.css -o popup/popup.css",
     "build:manifest:chrome": "node scripts/build-manifest.js chrome-mv3",
     "build:manifest:firefox": "node scripts/build-manifest.js firefox-mv2",
     "package:chrome": "npm run build:manifest:chrome && node scripts/package-extension.js chrome-mv3",
@@ -11,6 +12,8 @@
     "package:all": "npm run package:chrome && npm run package:firefox"
   },
   "devDependencies": {
-    "crx3": "^1.1.3"
+    "@tailwindcss/cli": "^4.3.1",
+    "crx3": "^1.1.3",
+    "tailwindcss": "^4.3.1"
   }
 }

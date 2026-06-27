@@ -66,6 +66,8 @@ function inferFormat(url, contentType) {
 
 function looksLikeSubtitle(url, contentType) {
   if (HLS_PLAYLIST_REGEX.test(url)) return false;
+  if (/_thumbs\.vtt(\?|$)/i.test(url)) return false;
+  if (/\/thumb\//i.test(url) && /application\/octet-stream/i.test(contentType)) return false;
   if (SUBTITLE_REGEX.test(url)) return true;
   if (!contentType) return false;
   if (/mpegurl|application\/vnd\.apple\.mpegurl/i.test(contentType)) return false;
@@ -83,6 +85,7 @@ function subtitleCandidateScore(candidate) {
   if (url.includes("vi") || url.includes("vietnam")) score += 8;
   if (url.includes("caption") || url.includes("subtitle")) score += 4;
   if (host === "vodcdn.fptplay.net" || host.endsWith(".vodcdn.fptplay.net")) score += 8;
+  if (host === "vod.fptplay53.net") score += 8;
   if (url.includes("/subtitles/vi/")) score += 10;
   if (url.includes(".vie.vtt") || (url.includes(".vie.") && url.includes(".vtt"))) score += 12;
   return score;

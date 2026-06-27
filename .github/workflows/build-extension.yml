@@ -16,19 +16,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 10
-
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm install
+
+      - name: Build CSS
+        run: npm run build:css
 
       - name: Build + package
         env:
@@ -37,9 +34,9 @@ jobs:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           if [ "${{ matrix.target }}" = "chrome-mv3" ]; then
-            pnpm run package:chrome
+            npm run package:chrome
           else
-            pnpm run package:firefox
+            npm run package:firefox
           fi
 
       - name: Upload package artifact
@@ -65,13 +62,13 @@ jobs:
 
     steps:
       - name: Download workflow artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             dist/crawlsub-chrome-mv3-v*.zip

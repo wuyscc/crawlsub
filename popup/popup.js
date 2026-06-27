@@ -4,9 +4,11 @@ const PREF_RANGE = "crawlsub_pref_episode_range";
 const PREF_BYPASS = "crawlsub_pref_bypass_crawl";
 const PREF_INCLUDE_SOURCE = "crawlsub_pref_include_source";
 const PREF_EPISODE_DELAY_MS = "crawlsub_pref_episode_delay_ms";
+const PREF_SINGLE_DELAY_MS = "crawlsub_pref_single_delay_ms";
 const PREF_THEME_MODE = "crawlsub_pref_theme_mode";
 const PREF_ADVANCED_OPEN = "crawlsub_pref_advanced_open";
 const DEFAULT_EPISODE_DELAY_MS = 1800; // Keep in sync with src/background.js
+const DEFAULT_SINGLE_DELAY_MS = 3000; // Keep in sync with src/background.js
 const api = globalThis.extensionApi;
 let pollTimer = null;
 let currentJobId = null;
@@ -22,6 +24,7 @@ function setStatus(message, kind = "idle") {
   const badge = document.getElementById("badge");
   status.textContent = typeof message === "string" ? message : JSON.stringify(message, null, 2);
   badge.className = "status-tag";
+  badge.dataset.kind = kind;
   if (kind === "working") return void (badge.textContent = "RUN");
   if (kind === "error") return void (badge.textContent = "ERR");
   if (kind === "success") return void (badge.textContent = "DONE");
@@ -138,29 +141,31 @@ function getPrefs() {
     episodeRange: document.getElementById("episodeRange").value.trim(),
     bypassCrawl: document.getElementById("bypassCrawl").checked,
     includeSource: document.getElementById("includeSource").checked,
-    episodeDelayMs: document.getElementById("episodeDelayMs").value.trim()
+    episodeDelayMs: document.getElementById("episodeDelayMs").value.trim(),
+    singleDelayMs: document.getElementById("singleDelayMs").value.trim()
   };
 }
 
 function savePrefs() {
   const prefs = getPrefs();
-  api.storageSet({ [PREF_CONVERT]: prefs.convertToSrt, [PREF_SKIP]: prefs.skipCompleted, [PREF_RANGE]: prefs.episodeRange, [PREF_BYPASS]: prefs.bypassCrawl, [PREF_INCLUDE_SOURCE]: prefs.includeSource, [PREF_EPISODE_DELAY_MS]: prefs.episodeDelayMs });
+  api.storageSet({ [PREF_CONVERT]: prefs.convertToSrt, [PREF_SKIP]: prefs.skipCompleted, [PREF_RANGE]: prefs.episodeRange, [PREF_BYPASS]: prefs.bypassCrawl, [PREF_INCLUDE_SOURCE]: prefs.includeSource, [PREF_EPISODE_DELAY_MS]: prefs.episodeDelayMs, [PREF_SINGLE_DELAY_MS]: prefs.singleDelayMs });
 }
 
 function loadPrefs() {
-  api.storageGet([PREF_CONVERT, PREF_SKIP, PREF_RANGE, PREF_BYPASS, PREF_INCLUDE_SOURCE, PREF_EPISODE_DELAY_MS, PREF_THEME_MODE, PREF_ADVANCED_OPEN]).then((res) => {
+  api.storageGet([PREF_CONVERT, PREF_SKIP, PREF_RANGE, PREF_BYPASS, PREF_INCLUDE_SOURCE, PREF_EPISODE_DELAY_MS, PREF_SINGLE_DELAY_MS, PREF_THEME_MODE, PREF_ADVANCED_OPEN]).then((res) => {
     document.getElementById("convert").checked = res[PREF_CONVERT] === undefined ? true : !!res[PREF_CONVERT];
     document.getElementById("skipCompleted").checked = res[PREF_SKIP] === undefined ? true : !!res[PREF_SKIP];
     document.getElementById("episodeRange").value = typeof res[PREF_RANGE] === "string" ? res[PREF_RANGE] : "";
     document.getElementById("bypassCrawl").checked = !!res[PREF_BYPASS];
     document.getElementById("includeSource").checked = res[PREF_INCLUDE_SOURCE] === undefined ? true : !!res[PREF_INCLUDE_SOURCE];
     document.getElementById("episodeDelayMs").value = String(res[PREF_EPISODE_DELAY_MS] || DEFAULT_EPISODE_DELAY_MS);
+    document.getElementById("singleDelayMs").value = String(res[PREF_SINGLE_DELAY_MS] !== undefined ? res[PREF_SINGLE_DELAY_MS] : DEFAULT_SINGLE_DELAY_MS);
     applyTheme(res[PREF_THEME_MODE] || "system");
     const isOpen = !!res[PREF_ADVANCED_OPEN];
     const body = document.getElementById("advanced-body");
     const toggle = document.getElementById("advanced-toggle");
-    body.classList.toggle("open", isOpen);
-    toggle.textContent = isOpen ? "▾ ADVANCED" : "▸ ADVANCED";
+    if (body) body.classList.toggle("open", isOpen);
+    if (toggle) toggle.textContent = isOpen ? "▾ ADVANCED" : "▸ ADVANCED";
   });
 }
 
@@ -185,7 +190,7 @@ async function sendAction(type, overrides = {}) {
     return;
   }
 
-  const { convertToSrt, skipCompleted, episodeRange, bypassCrawl, includeSource, episodeDelayMs } = getPrefs();
+  const { convertToSrt, skipCompleted, episodeRange, bypassCrawl, includeSource, episodeDelayMs, singleDelayMs } = getPrefs();
   const parsedRange = type === "START_FULL_SEASON_CRAWL" ? parseEpisodeRangeInput(episodeRange) : null;
   if (parsedRange?.error) {
     setStatus(`Error: ${parsedRange.error}`, "error");
@@ -194,7 +199,7 @@ async function sendAction(type, overrides = {}) {
   setBusy(true);
   setStatus("Working...", "working");
 
-  api.sendRuntimeMessage({ type, tabId: tab.id, convertToSrt, skipCompleted, bypassCrawl, includeSource, episodeDelayMs, episodeRange: parsedRange || undefined, ...overrides })
+  api.sendRuntimeMessage({ type, tabId: tab.id, convertToSrt, skipCompleted, bypassCrawl, includeSource, episodeDelayMs, singleDelayMs, episodeRange: parsedRange || undefined, ...overrides })
     .then((resp) => {
       if (!resp?.ok) return setStatus(`Error: ${resp?.error || "unknown"}`, "error");
       if (type === "START_FULL_SEASON_CRAWL" && resp.result?.id) {
@@ -238,6 +243,7 @@ function init() {
   document.getElementById("skipCompleted").addEventListener("change", savePrefs);
   document.getElementById("episodeRange").addEventListener("change", savePrefs);
   document.getElementById("episodeDelayMs").addEventListener("change", savePrefs);
+  document.getElementById("singleDelayMs").addEventListener("change", savePrefs);
   document.getElementById("bypassCrawl").addEventListener("change", savePrefs);
   document.getElementById("includeSource").addEventListener("change", savePrefs);
   document.getElementById("single").addEventListener("click", () => sendAction("START_SINGLE_CRAWL"));
@@ -245,11 +251,11 @@ function init() {
   document.getElementById("cancel").addEventListener("click", cancelCurrentJob);
   document.getElementById("logs").addEventListener("click", fetchLogs);
   document.getElementById("cancel").disabled = true;
-  document.getElementById("advanced-toggle").addEventListener("click", () => {
+  document.getElementById("advanced-toggle")?.addEventListener("click", () => {
     const body = document.getElementById("advanced-body");
     const toggle = document.getElementById("advanced-toggle");
     const isOpen = body.classList.toggle("open");
-    toggle.textContent = isOpen ? "▾ ADVANCED" : "▸ ADVANCED";
+    if (toggle) toggle.textContent = isOpen ? "▾ ADVANCED" : "▸ ADVANCED";
     api.storageSet({ [PREF_ADVANCED_OPEN]: isOpen });
   });
   detectCurrentSite();

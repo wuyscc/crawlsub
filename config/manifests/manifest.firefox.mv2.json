@@ -28,7 +28,8 @@
     "notifications",
     "https://*.tv360.vn/*",
     "https://*.fptplay.vn/*",
-    "https://*.fptplay.net/*"
+    "https://*.fptplay.net/*",
+    "https://*.fptplay53.net/*"
   ],
   "content_scripts": [
     {

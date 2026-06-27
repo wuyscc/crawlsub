@@ -2,47 +2,88 @@
 <html>
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CrawlSub</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body data-theme="dark">
-    <main class="panel">
-      <header class="topbar">
-        <h1>CRAWLSUB</h1>
-        <div class="topbar-right">
-          <div class="theme-switch" role="group" aria-label="Theme mode">
-            <button type="button" class="theme-btn" data-theme-mode="system">SYS</button>
-            <button type="button" class="theme-btn" data-theme-mode="light">L</button>
-            <button type="button" class="theme-btn" data-theme-mode="dark">D</button>
+
+    <header class="app-header">
+      <span class="app-logo">CRAWLSUB</span>
+      <div class="header-right">
+        <span id="site-banner"></span>
+        <span id="badge" class="status-tag">IDLE</span>
+      </div>
+    </header>
+
+    <main class="app-body">
+
+      <section class="panel">
+        <div class="panel-label">OPTIONS</div>
+        <div class="opt-grid">
+          <label class="opt-btn">
+            <input id="convert" type="checkbox" checked />
+            VTT→SRT
+          </label>
+          <label class="opt-btn">
+            <input id="skipCompleted" type="checkbox" checked />
+            Skip Done
+          </label>
+          <label class="opt-btn">
+            <input id="bypassCrawl" type="checkbox" />
+            Bypass Nav
+          </label>
+          <label class="opt-btn">
+            <input id="includeSource" type="checkbox" checked />
+            Src Name
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-label">ADVANCED</div>
+        <div class="field-row">
+          <span class="field-key">RANGE</span>
+          <input id="episodeRange" type="text" placeholder="1-7" class="field-input" />
+        </div>
+        <div class="delay-grid">
+          <div class="field-row">
+            <span class="field-key">1 EP</span>
+            <input id="singleDelayMs" type="number" min="0" max="15000" step="100" placeholder="3000" class="field-input" />
+            <span class="field-unit">ms</span>
           </div>
-          <span id="badge" class="status-tag">IDLE</span>
-        </div>
-      </header>
-
-      <div id="site-banner"></div>
-
-      <section class="block">
-        <label class="row"><input id="convert" type="checkbox" checked /><span>Convert VTT -> SRT</span></label>
-        <label class="row"><input id="skipCompleted" type="checkbox" checked /><span>Skip completed subtitles</span></label>
-        <label class="row"><input id="bypassCrawl" type="checkbox" /><span>Bypass episode navigation</span></label>
-        <label class="row"><input id="includeSource" type="checkbox" checked /><span>Include source in filename</span></label>
-        <button id="advanced-toggle" type="button">▸ ADVANCED</button>
-        <div id="advanced-body">
-          <label class="field"><span>RANGE&gt; Episode range (e.g. 1-7)</span><input id="episodeRange" type="text" placeholder="1-7" /></label>
-          <label class="field"><span>DELAY&gt; Delay between episodes (ms)</span><input id="episodeDelayMs" type="number" min="300" max="15000" step="100" placeholder="1800" /></label>
+          <div class="field-row field-row--br">
+            <span class="field-key">ALL</span>
+            <input id="episodeDelayMs" type="number" min="300" max="15000" step="100" placeholder="1800" class="field-input" />
+            <span class="field-unit">ms</span>
+          </div>
         </div>
       </section>
 
-      <section class="actions">
-        <button id="single" class="cmd">THIS EP</button>
-        <button id="full" class="cmd">ALL EPS</button>
-        <button id="cancel" class="cmd danger">STOP</button>
-        <button id="logs" class="cmd">LOGS</button>
+      <section class="panel">
+        <div class="panel-label">ACTIONS</div>
+        <div class="actions">
+          <button id="single" class="cmd">THIS EP</button>
+          <button id="full"   class="cmd">ALL EPS</button>
+          <button id="cancel" class="cmd danger">STOP</button>
+          <button id="logs"   class="cmd muted">LOGS</button>
+        </div>
       </section>
 
-      <pre id="status" class="console">READY.</pre>
+      <section class="panel panel--output">
+        <div class="panel-label">OUTPUT</div>
+        <pre id="status" class="console">READY.</pre>
+      </section>
+
     </main>
+
+    <footer class="app-footer">
+      <div class="theme-switch" role="group" aria-label="Theme mode">
+        <button type="button" class="theme-btn" data-theme-mode="system">SYS</button>
+        <button type="button" class="theme-btn" data-theme-mode="light">LIGHT</button>
+        <button type="button" class="theme-btn" data-theme-mode="dark">DARK</button>
+      </div>
+    </footer>
+
     <script src="../src/extension-api.js"></script>
     <script src="popup-helpers.js"></script>
     <script src="popup.js"></script>

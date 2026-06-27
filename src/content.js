@@ -57,8 +57,10 @@ function normalizeEpisodeUrl(raw) {
 
 function extractEpisodeTitle(anchor) {
   const label = (anchor.getAttribute("aria-label") || "").trim();
-  const text = (anchor.textContent || "").trim();
-  return label || text || "episode";
+  if (label) return label;
+  const firstP = anchor.querySelector("p");
+  if (firstP) return firstP.textContent.trim() || "episode";
+  return anchor.textContent.trim() || "episode";
 }
 
 function inferEpisodeOrder(ep) {
